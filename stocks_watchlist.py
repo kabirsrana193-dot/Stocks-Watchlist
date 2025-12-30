@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 from scipy.signal import argrelextrema
 from datetime import datetime, timedelta
-from nselib import capital_market
+from nsepython import *
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -42,52 +42,60 @@ WATCHLIST = {
 }
 
 # ============================================================================
-# DATA FETCHING - Using nselib for real-time NSE data
+# DATA FETCHING - Using nsepython for real-time NSE data
 # ============================================================================
 @st.cache_data(ttl=300)  # Cache for 5 minutes
 def fetch_stock_data(symbol):
-    """Fetch historical and live data from NSE"""
+    """Fetch historical data from NSE using nsepython"""
     try:
-        # Get historical data (1 minute candles for intraday)
-        hist_data = capital_market.price_volume_and_deliverable_position_data(
-            symbol=symbol,
-            from_date=(datetime.now() - timedelta(days=5)).strftime('%d-%m-%Y'),
-            to_date=datetime.now().strftime('%d-%m-%Y')
-        )
-
-        if hist_data is None or len(hist_data) == 0:
+        # Get historical data for last 30 days
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=30)
+        
+        # Fetch equity historical data
+        data = equity_history(symbol, "EQ", start_date, end_date)
+        
+        if data is None or len(data) == 0:
             return None
-
+        
         # Convert to DataFrame
-        df = pd.DataFrame(hist_data)
-
-        # Rename columns to match expected format
-        if 'CH_TIMESTAMP' in df.columns:
-            df['Date'] = pd.to_datetime(df['CH_TIMESTAMP'])
-        if 'CH_CLOSING_PRICE' in df.columns:
-            df['Close'] = df['CH_CLOSING_PRICE']
-        if 'CH_OPENING_PRICE' in df.columns:
-            df['Open'] = df['CH_OPENING_PRICE']
-        if 'CH_TRADE_HIGH_PRICE' in df.columns:
-            df['High'] = df['CH_TRADE_HIGH_PRICE']
-        if 'CH_TRADE_LOW_PRICE' in df.columns:
-            df['Low'] = df['CH_TRADE_LOW_PRICE']
-
-        # Set index and ensure it's DatetimeIndex before resampling
+        df = pd.DataFrame(data)
+        
+        # Check if required columns exist and rename them
+        column_mapping = {
+            'CH_TIMESTAMP': 'Date',
+            'CH_TRADE_HIGH_PRICE': 'High',
+            'CH_TRADE_LOW_PRICE': 'Low',
+            'CH_OPENING_PRICE': 'Open',
+            'CH_CLOSING_PRICE': 'Close',
+            'CH_TOT_TRADED_QTY': 'Volume'
+        }
+        
+        # Rename columns if they exist
+        for old_col, new_col in column_mapping.items():
+            if old_col in df.columns:
+                df[new_col] = df[old_col]
+        
+        # Check if we have the required columns
+        required_cols = ['Date', 'Open', 'High', 'Low', 'Close']
+        if not all(col in df.columns for col in required_cols):
+            st.warning(f"Missing required columns for {symbol}. Available: {df.columns.tolist()}")
+            return None
+        
+        # Convert Date to datetime and set as index
+        df['Date'] = pd.to_datetime(df['Date'])
         df = df.set_index('Date').sort_index()
         
-        # CRITICAL FIX: Ensure index is DatetimeIndex
+        # Ensure index is DatetimeIndex
         if not isinstance(df.index, pd.DatetimeIndex):
             df.index = pd.to_datetime(df.index)
-
-        # Resample to hourly for analysis
-        df_hourly = df.resample('1H').agg({
-            'Open': 'first',
-            'High': 'max',
-            'Low': 'min',
-            'Close': 'last'
-        }).dropna()
-
+        
+        # Select only required columns
+        df = df[['Open', 'High', 'Low', 'Close']]
+        
+        # Resample to hourly for analysis (forward fill for missing hours)
+        df_hourly = df.resample('1H').ffill().dropna()
+        
         return df_hourly
 
     except Exception as e:
@@ -96,34 +104,35 @@ def fetch_stock_data(symbol):
 
 @st.cache_data(ttl=60)  # Cache for 1 minute
 def get_live_price(symbol):
-    """Get current live price from NSE"""
+    """Get current live price from NSE using nsepython"""
     try:
-        quote = capital_market.equity_quote(symbol)
+        quote = nse_eq(symbol)
         if quote and 'priceInfo' in quote:
             return quote['priceInfo']['lastPrice']
         return None
-    except:
+    except Exception as e:
         return None
 
 def get_quote_data(symbol):
-    """Get full quote including change, volume etc"""
+    """Get full quote including change, volume etc using nsepython"""
     try:
-        quote = capital_market.equity_quote(symbol)
+        quote = nse_eq(symbol)
         if not quote:
             return None
 
         price_info = quote.get('priceInfo', {})
+        intraday = price_info.get('intraDayHighLow', {})
 
         return {
             'lastPrice': price_info.get('lastPrice', 0),
             'change': price_info.get('change', 0),
             'pChange': price_info.get('pChange', 0),
             'open': price_info.get('open', 0),
-            'dayHigh': price_info.get('intraDayHighLow', {}).get('max', 0),
-            'dayLow': price_info.get('intraDayHighLow', {}).get('min', 0),
+            'dayHigh': intraday.get('max', 0),
+            'dayLow': intraday.get('min', 0),
             'previousClose': price_info.get('previousClose', 0),
         }
-    except:
+    except Exception as e:
         return None
 
 # ============================================================================
