@@ -502,7 +502,7 @@ def create_heatmap(results):
 # ============================================================================
 def main():
     st.title("📊 My Personal Stock Dashboard")
-    st.markdown(f"**Live NSE Data** | Last Updated: {datetime.now().strftime('%H:%M:%S')}")
+    st.markdown(f"**Live NSE Data** | Last Updated: {datetime().strftime('%H:%M:%S')}")
 
     # Sidebar
     with st.sidebar:
