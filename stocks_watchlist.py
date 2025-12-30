@@ -73,7 +73,12 @@ def fetch_stock_data(symbol):
         if 'CH_TRADE_LOW_PRICE' in df.columns:
             df['Low'] = df['CH_TRADE_LOW_PRICE']
 
+        # Set index and ensure it's DatetimeIndex before resampling
         df = df.set_index('Date').sort_index()
+        
+        # CRITICAL FIX: Ensure index is DatetimeIndex
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index)
 
         # Resample to hourly for analysis
         df_hourly = df.resample('1H').agg({
