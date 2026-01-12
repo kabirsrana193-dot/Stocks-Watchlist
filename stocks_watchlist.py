@@ -377,105 +377,105 @@ with tab2:
 
     ticker = STOCK_TICKER_MAP.get(chart_stock)
     if ticker:
-        with st.spinner("Processing chart..."):
-            df = yf.download(ticker, period=chart_period, interval=chart_interval, progress=False)
-            if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+        try:
+            with st.spinner("Processing chart..."):
+                df = yf.download(ticker, period=chart_period, interval=chart_interval, progress=False)
+                if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
 
-            if not df.empty:
-                # --- PLOT LOGIC ---
-                # Determine subplots: Main chart is row 1. Each oscillator adds a row.
-                rows = 1 + len(selected_oscillators)
-                row_heights = [0.5] + [0.5/len(selected_oscillators)] * len(selected_oscillators) if selected_oscillators else [1]
-                
-                fig = make_subplots(
-                    rows=rows, cols=1, 
-                    shared_xaxes=True, 
-                    vertical_spacing=0.03,
-                    row_heights=row_heights
-                )
-
-                # Main Chart (Row 1)
-                fig.add_trace(go.Candlestick(
-                    x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
-                    name='Price'
-                ), row=1, col=1)
-
-                # Overlays
-                if show_sma:
-                    fig.add_trace(go.Scatter(x=df.index, y=calculate_sma(df['Close'], 20), name='SMA 20', line=dict(color='orange', width=1)), row=1, col=1)
-                    fig.add_trace(go.Scatter(x=df.index, y=calculate_sma(df['Close'], 50), name='SMA 50', line=dict(color='blue', width=1)), row=1, col=1)
-                    fig.add_trace(go.Scatter(x=df.index, y=calculate_sma(df['Close'], 200), name='SMA 200', line=dict(color='purple', width=1)), row=1, col=1)
-                
-                if show_ema:
-                    fig.add_trace(go.Scatter(x=df.index, y=calculate_ema(df['Close'], 9), name='EMA 9', line=dict(color='yellow', width=1)), row=1, col=1)
-                    fig.add_trace(go.Scatter(x=df.index, y=calculate_ema(df['Close'], 50), name='EMA 50', line=dict(color='cyan', width=1)), row=1, col=1)
-
-                if show_bb:
-                    u, m, l = calculate_bollinger_bands(df['Close'])
-                    fig.add_trace(go.Scatter(x=df.index, y=u, name='BB Upper', line=dict(color='gray', width=1, dash='dot')), row=1, col=1)
-                    fig.add_trace(go.Scatter(x=df.index, y=l, name='BB Lower', line=dict(color='gray', width=1, dash='dot'), fill='tonexty'), row=1, col=1)
-
-                if show_st:
-                    stVal, stDir = calculate_supertrend(df)
-                    # Filter for plot
-                    fig.add_trace(go.Scatter(x=df.index, y=stVal, name='Supertrend', line=dict(color='green' if stDir.iloc[-1]==1 else 'red', width=2)), row=1, col=1)
-
-                if show_ichi:
-                    import plotly.graph_objects as go # redundant import safety
-                    # Ichimoku logic... simplified
-                    pass # (Skipping full ichimoku complexity to keep plot clean, unless requested explicitly)
-
-                # Subplots - Oscillators
-                current_row = 2
-                for osc in selected_oscillators:
-                    if osc == "RSI":
-                        rsi = calculate_rsi(df['Close'])
-                        fig.add_trace(go.Scatter(x=df.index, y=rsi, name='RSI', line=dict(color='purple')), row=current_row, col=1)
-                        fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=70, y1=70, line=dict(color="red", width=1, dash="dash"), row=current_row, col=1)
-                        fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=30, y1=30, line=dict(color="green", width=1, dash="dash"), row=current_row, col=1)
+                if not df.empty:
+                    # --- PLOT LOGIC ---
+                    # Determine subplots: Main chart is row 1. Each oscillator adds a row.
+                    rows = 1 + len(selected_oscillators)
+                    row_heights = [0.5] + [0.5/len(selected_oscillators)] * len(selected_oscillators) if selected_oscillators else [1]
                     
-                    elif osc == "MACD":
-                        macd, sig, hist = calculate_macd(df['Close'])
-                        fig.add_trace(go.Scatter(x=df.index, y=macd, name='MACD', line=dict(color='blue')), row=current_row, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=sig, name='Signal', line=dict(color='orange')), row=current_row, col=1)
-                        fig.add_trace(go.Bar(x=df.index, y=hist, name='Hist'), row=current_row, col=1)
+                    fig = make_subplots(
+                        rows=rows, cols=1, 
+                        shared_xaxes=True, 
+                        vertical_spacing=0.03,
+                        row_heights=row_heights
+                    )
 
-                    elif osc == "Stochastic":
-                        k, d = calculate_stochastic(df)
-                        fig.add_trace(go.Scatter(x=df.index, y=k, name='Stoch %K', line=dict(color='blue')), row=current_row, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=d, name='Stoch %D', line=dict(color='orange')), row=current_row, col=1)
-                        fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=80, y1=80, line=dict(color="red", width=1), row=current_row, col=1)
-                        fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=20, y1=20, line=dict(color="green", width=1), row=current_row, col=1)
+                    # Main Chart (Row 1)
+                    fig.add_trace(go.Candlestick(
+                        x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
+                        name='Price'
+                    ), row=1, col=1)
 
-                    elif osc == "CCI":
-                        cci = calculate_cci(df)
-                        fig.add_trace(go.Scatter(x=df.index, y=cci, name='CCI', line=dict(color='brown')), row=current_row, col=1)
-                        fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=100, y1=100, line=dict(color="red", width=1, dash='dash'), row=current_row, col=1)
-                        fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=-100, y1=-100, line=dict(color="green", width=1, dash='dash'), row=current_row, col=1)
-
-                    elif osc == "Williams %R":
-                         wr = calculate_williams_r(df)
-                         fig.add_trace(go.Scatter(x=df.index, y=wr, name='Williams %R', line=dict(color='black')), row=current_row, col=1)
-                         fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=-20, y1=-20, line=dict(color="red", width=1), row=current_row, col=1)
-                         fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=-80, y1=-80, line=dict(color="green", width=1), row=current_row, col=1)
+                    # Overlays
+                    if show_sma:
+                        fig.add_trace(go.Scatter(x=df.index, y=calculate_sma(df['Close'], 20), name='SMA 20', line=dict(color='orange', width=1)), row=1, col=1)
+                        fig.add_trace(go.Scatter(x=df.index, y=calculate_sma(df['Close'], 50), name='SMA 50', line=dict(color='blue', width=1)), row=1, col=1)
+                        fig.add_trace(go.Scatter(x=df.index, y=calculate_sma(df['Close'], 200), name='SMA 200', line=dict(color='purple', width=1)), row=1, col=1)
                     
-                    elif osc == "ADX":
-                        adx, pdi, mdi = calculate_adx(df)
-                        fig.add_trace(go.Scatter(x=df.index, y=adx, name='ADX', line=dict(color='black', width=2)), row=current_row, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=pdi, name='+DI', line=dict(color='green', width=1)), row=current_row, col=1)
-                        fig.add_trace(go.Scatter(x=df.index, y=mdi, name='-DI', line=dict(color='red', width=1)), row=current_row, col=1)
-                        fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=25, y1=25, line=dict(color="gray", width=1, dash="dash"), row=current_row, col=1)
+                    if show_ema:
+                        fig.add_trace(go.Scatter(x=df.index, y=calculate_ema(df['Close'], 9), name='EMA 9', line=dict(color='yellow', width=1)), row=1, col=1)
+                        fig.add_trace(go.Scatter(x=df.index, y=calculate_ema(df['Close'], 50), name='EMA 50', line=dict(color='cyan', width=1)), row=1, col=1)
 
-                    elif osc == "AO":
-                        ao = calculate_ao(df['High'], df['Low'])
-                        colors = ['green' if x >= 0 else 'red' for x in ao]
-                        fig.add_trace(go.Bar(x=df.index, y=ao, name='AO', marker_color=colors), row=current_row, col=1)
+                    if show_bb:
+                        u, m, l = calculate_bollinger_bands(df['Close'])
+                        fig.add_trace(go.Scatter(x=df.index, y=u, name='BB Upper', line=dict(color='gray', width=1, dash='dot')), row=1, col=1)
+                        fig.add_trace(go.Scatter(x=df.index, y=l, name='BB Lower', line=dict(color='gray', width=1, dash='dot'), fill='tonexty'), row=1, col=1)
 
-                    current_row += 1
+                    if show_st:
+                        stVal, stDir = calculate_supertrend(df)
+                        # Filter for plot
+                        fig.add_trace(go.Scatter(x=df.index, y=stVal, name='Supertrend', line=dict(color='green' if stDir.iloc[-1]==1 else 'red', width=2)), row=1, col=1)
 
-                fig.update_layout(height=400 + (200 * len(selected_oscillators)), xaxis_rangeslider_visible=False)
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.warning("No data found for this interval/period combination.")
-except Exception as e:
-st.error(str(e))
+                    if show_ichi:
+                        pass 
+
+                    # Subplots - Oscillators
+                    current_row = 2
+                    for osc in selected_oscillators:
+                        if osc == "RSI":
+                            rsi = calculate_rsi(df['Close'])
+                            fig.add_trace(go.Scatter(x=df.index, y=rsi, name='RSI', line=dict(color='purple')), row=current_row, col=1)
+                            fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=70, y1=70, line=dict(color="red", width=1, dash="dash"), row=current_row, col=1)
+                            fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=30, y1=30, line=dict(color="green", width=1, dash="dash"), row=current_row, col=1)
+                        
+                        elif osc == "MACD":
+                            macd, sig, hist = calculate_macd(df['Close'])
+                            fig.add_trace(go.Scatter(x=df.index, y=macd, name='MACD', line=dict(color='blue')), row=current_row, col=1)
+                            fig.add_trace(go.Scatter(x=df.index, y=sig, name='Signal', line=dict(color='orange')), row=current_row, col=1)
+                            fig.add_trace(go.Bar(x=df.index, y=hist, name='Hist'), row=current_row, col=1)
+
+                        elif osc == "Stochastic":
+                            k, d = calculate_stochastic(df)
+                            fig.add_trace(go.Scatter(x=df.index, y=k, name='Stoch %K', line=dict(color='blue')), row=current_row, col=1)
+                            fig.add_trace(go.Scatter(x=df.index, y=d, name='Stoch %D', line=dict(color='orange')), row=current_row, col=1)
+                            fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=80, y1=80, line=dict(color="red", width=1), row=current_row, col=1)
+                            fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=20, y1=20, line=dict(color="green", width=1), row=current_row, col=1)
+
+                        elif osc == "CCI":
+                            cci = calculate_cci(df)
+                            fig.add_trace(go.Scatter(x=df.index, y=cci, name='CCI', line=dict(color='brown')), row=current_row, col=1)
+                            fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=100, y1=100, line=dict(color="red", width=1, dash='dash'), row=current_row, col=1)
+                            fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=-100, y1=-100, line=dict(color="green", width=1, dash='dash'), row=current_row, col=1)
+
+                        elif osc == "Williams %R":
+                             wr = calculate_williams_r(df)
+                             fig.add_trace(go.Scatter(x=df.index, y=wr, name='Williams %R', line=dict(color='black')), row=current_row, col=1)
+                             fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=-20, y1=-20, line=dict(color="red", width=1), row=current_row, col=1)
+                             fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=-80, y1=-80, line=dict(color="green", width=1), row=current_row, col=1)
+                        
+                        elif osc == "ADX":
+                            adx, pdi, mdi = calculate_adx(df)
+                            fig.add_trace(go.Scatter(x=df.index, y=adx, name='ADX', line=dict(color='black', width=2)), row=current_row, col=1)
+                            fig.add_trace(go.Scatter(x=df.index, y=pdi, name='+DI', line=dict(color='green', width=1)), row=current_row, col=1)
+                            fig.add_trace(go.Scatter(x=df.index, y=mdi, name='-DI', line=dict(color='red', width=1)), row=current_row, col=1)
+                            fig.add_shape(type="line", x0=df.index[0], x1=df.index[-1], y0=25, y1=25, line=dict(color="gray", width=1, dash="dash"), row=current_row, col=1)
+
+                        elif osc == "AO":
+                            ao = calculate_ao(df['High'], df['Low'])
+                            colors = ['green' if x >= 0 else 'red' for x in ao]
+                            fig.add_trace(go.Bar(x=df.index, y=ao, name='AO', marker_color=colors), row=current_row, col=1)
+
+                        current_row += 1
+
+                    fig.update_layout(height=400 + (200 * len(selected_oscillators)), xaxis_rangeslider_visible=False)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("No data found for this interval/period combination.")
+        except Exception as e:
+            st.error(str(e))
+
