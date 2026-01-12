@@ -477,5 +477,5 @@ with tab2:
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.warning("No data found for this interval/period combination.")
-        except Exception as e:
-            st.error(str(e))
+except Exception as e:
+st.error(str(e))
